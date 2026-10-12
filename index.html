@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>7人制战术板</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            touch-action: none; /* Prevent mobile scrolling during drag */
+            background-color: #111;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        /* Pitch Styling */
+        .pitch-bg {
+            background-image: repeating-linear-gradient(
+                0deg,
+                #22c55e,
+                #22c55e 10%,
+                #16a34a 10%,
+                #16a34a 20%
+            );
+        }
+
+        .pitch-line {
+            position: absolute;
+            border-color: rgba(255, 255, 255, 0.8);
+            border-style: solid;
+        }
+
+        /* Player Token Base */
+        .player-token {
+            position: absolute;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: grab;
+            transition: transform 0.1s ease-out, background-color 0.2s, color 0.2s, border-color 0.2s;
+            box-sizing: border-box;
+        }
+
+        .player-token:active {
+            cursor: grabbing;
+            transform: scale(1.2);
+            z-index: 1000 !important;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        .player-number {
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 2px;
+        }
+
+        .player-name {
+            font-size: 10px;
+            white-space: nowrap;
+            line-height: 1;
+            font-weight: 600;
+        }
+
+        /* Status Colors (Based on the provided kit image) */
+        .on-pitch {
+            background-color: #161e38; /* Deep Navy Blue */
+            color: #ffffff;            /* White text */
+            border: 3px solid #6bc3c2; /* Light Teal border */
+        }
+
+        .on-bench {
+            background-color: #6bc3c2; /* Light Teal */
+            color: #161e38;            /* Deep Navy Blue text */
+            border: 3px solid transparent; /* Keep size consistent */
+        }
+    </style>
+</head>
+<body class="flex flex-col h-[100dvh] w-full text-white">
+
+    <div id="capture-area" class="flex-1 relative w-full h-[calc(100vh-80px)] overflow-hidden">
+        
+        <!-- Pitch Area (Top 65%) -->
+        <div id="pitch-area" class="absolute top-0 left-0 w-full h-[65%] pitch-bg">
+            <!-- Outer Boundary -->
+            <div class="pitch-line inset-3 border-2"></div>
+            
+            <!-- Halfway Line -->
+            <div class="pitch-line top-1/2 left-3 right-3 h-0 border-t-2"></div>
+            
+            <!-- Center Circle -->
+            <div class="pitch-line top-1/2 left-1/2 w-20 h-20 -mt-10 -ml-10 border-2 rounded-full"></div>
+            <div class="absolute top-1/2 left-1/2 w-2 h-2 -mt-1 -ml-1 bg-white/80 rounded-full"></div>
+            
+            <!-- Top Penalty Area -->
+            <div class="pitch-line top-3 left-1/2 -ml-24 w-48 h-20 border-2 border-t-0"></div>
+            <div class="pitch-line top-3 left-1/2 -ml-12 w-24 h-8 border-2 border-t-0"></div>
+            
+            <!-- Bottom Penalty Area -->
+            <div class="pitch-line bottom-0 left-1/2 -ml-24 w-48 h-20 border-2 border-b-0 mb-3"></div>
+            <div class="pitch-line bottom-0 left-1/2 -ml-12 w-24 h-8 border-2 border-b-0 mb-3"></div>
+        </div>
+
+        <!-- Bench Area (Bottom 35%) -->
+        <div id="bench-area" class="absolute bottom-0 left-0 w-full h-[35%] bg-gray-900 border-t-4 border-[#6bc3c2]/50 shadow-[inset_0_10px_20px_rgba(0,0,0,0.5)]">
+            <div class="w-full text-center py-2 text-[#6bc3c2] text-sm font-bold tracking-widest opacity-80">
+                BENCH / 替补席
+            </div>
+        </div>
+
+        <!-- Players Container -->
+        <div id="players-container" class="absolute inset-0 w-full h-full pointer-events-none">
+            <!-- Player tokens injected via JS -->
+        </div>
+    </div>
+
+    <div class="h-20 bg-black flex items-center justify-center px-4 shadow-xl z-20">
+        <button id="btn-generate" class="w-full max-w-sm bg-[#161e38] border-2 border-[#6bc3c2] text-[#6bc3c2] font-bold py-3 px-6 rounded-xl shadow-lg transform transition active:scale-95 text-lg flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            一键截图发群
+        </button>
+    </div>
+
+    <div id="screenshot-modal" class="fixed inset-0 z-50 bg-black/95 hidden flex-col items-center justify-center p-4 transition-opacity duration-300 opacity-0 backdrop-blur-sm">
+        <div class="text-white text-center mb-6">
+            <h2 class="text-2xl font-bold mb-2 text-[#6bc3c2]">阵型图生成完毕</h2>
+            <p class="text-gray-300 text-sm flex items-center justify-center gap-1">
+                👉 长按下方图片保存或转发 👈
+            </p>
+        </div>
+        
+        <div class="relative w-full max-w-md max-h-[65vh] rounded-xl overflow-hidden shadow-2xl border-2 border-[#6bc3c2]">
+            <img id="result-img" src="" alt="战术板截图" class="w-full h-auto object-contain">
+        </div>
+        
+        <button id="btn-close-modal" class="mt-8 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-12 rounded-full shadow-lg transition active:scale-95">
+            关闭
+        </button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const captureArea = document.getElementById('capture-area');
+            const playersContainer = document.getElementById('players-container');
+            const tokenSize = 56;
+            const halfToken = tokenSize / 2;
+
+            // Player data provided by user
+            const roster = {
+                7: '程天遂', 8: '董亮', 9: '周熙源', 10: '孔为翔', 
+                11: '罗一鸣', 18: '马云', 20: '秦振青', 21: '梅杰', 
+                23: '陈挺', 25: '郑磊', 29: '戎家琛', 43: '刘晓嘉'
+            };
+
+            // Initialize all players in the bench area (bottom 35%)
+            Object.keys(roster).forEach((num, index) => {
+                const el = document.createElement('div');
+                // Start with 'on-bench' style
+                el.className = `player-token on-bench pointer-events-auto`;
+                
+                el.innerHTML = `
+                    <span class="player-number">${num}</span>
+                    <span class="player-name">${roster[num]}</span>
+                `;
+                
+                // Distribute evenly in the bench area (Y: 70% to 90%, X: distributed)
+                const row = Math.floor(index / 6);
+                const col = index % 6;
+                const leftPercent = 10 + (col * 16); // 10% to 90%
+                const topPercent = 72 + (row * 15);  // 72% or 87%
+
+                el.style.left = `calc(${leftPercent}% - ${halfToken}px)`;
+                el.style.top = `calc(${topPercent}% - ${halfToken}px)`;
+                
+                playersContainer.appendChild(el);
+                setupDrag(el);
+            });
+
+            // Drag State
+            let activeEl = null;
+            let startClientX = 0, startClientY = 0;
+            let startElLeft = 0, startElTop = 0;
+
+            function setupDrag(el) {
+                el.addEventListener('touchstart', handleDragStart, { passive: false });
+                el.addEventListener('mousedown', handleDragStart);
+            }
+
+            function handleDragStart(e) {
+                if(e.type === 'touchstart') e.preventDefault();
+                activeEl = e.currentTarget;
+                
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+                
+                startClientX = clientX;
+                startClientY = clientY;
+                startElLeft = activeEl.offsetLeft;
+                startElTop = activeEl.offsetTop;
+
+                activeEl.style.zIndex = '1000';
+            }
+
+            function handleDragMove(e) {
+                if (!activeEl) return;
+                
+                e.preventDefault(); 
+                
+                const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+                const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+
+                const dx = clientX - startClientX;
+                const dy = clientY - startClientY;
+
+                let newLeft = startElLeft + dx;
+                let newTop = startElTop + dy;
+
+                const maxX = captureArea.clientWidth - tokenSize;
+                const maxY = captureArea.clientHeight - tokenSize;
+                
+                newLeft = Math.max(0, Math.min(newLeft, maxX));
+                newTop = Math.max(0, Math.min(newTop, maxY));
+
+                activeEl.style.left = `${newLeft}px`;
+                activeEl.style.top = `${newTop}px`;
+            }
+
+            function handleDragEnd() {
+                if (!activeEl) return;
+                
+                // Determine position for color swapping
+                // Top 65% is pitch, Bottom 35% is bench
+                const centerY = activeEl.offsetTop + halfToken;
+                const splitY = captureArea.clientHeight * 0.65;
+
+                if (centerY < splitY) {
+                    activeEl.classList.add('on-pitch');
+                    activeEl.classList.remove('on-bench');
+                } else {
+                    activeEl.classList.add('on-bench');
+                    activeEl.classList.remove('on-pitch');
+                }
+
+                activeEl.style.zIndex = '10';
+                activeEl = null;
+            }
+
+            document.addEventListener('touchmove', handleDragMove, { passive: false });
+            document.addEventListener('touchend', handleDragEnd);
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+
+            const btnGenerate = document.getElementById('btn-generate');
+            const modal = document.getElementById('screenshot-modal');
+            const resultImg = document.getElementById('result-img');
+            const btnCloseModal = document.getElementById('btn-close-modal');
+
+            btnGenerate.addEventListener('click', () => {
+                const originalText = btnGenerate.innerHTML;
+                btnGenerate.innerHTML = '生成中...';
+                btnGenerate.disabled = true;
+
+                setTimeout(() => {
+                    html2canvas(captureArea, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#111827' // gray-900 background for capturing
+                    }).then(canvas => {
+                        const imgData = canvas.toDataURL('image/png');
+                        resultImg.src = imgData;
+                        
+                        modal.classList.remove('hidden');
+                        setTimeout(() => { modal.classList.remove('opacity-0'); }, 50);
+                    }).catch(err => {
+                        console.error('Screenshot failed:', err);
+                        alert('截图生成失败，请重试');
+                    }).finally(() => {
+                        btnGenerate.innerHTML = originalText;
+                        btnGenerate.disabled = false;
+                    });
+                }, 100);
+            });
+
+            btnCloseModal.addEventListener('click', () => {
+                modal.classList.add('opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    resultImg.src = ''; 
+                }, 300);
+            });
+        });
+    </script>
+</body>
+</html>
